@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compatibilidad 5.0 Máxima</title>
+
+<style>
+body{
+margin:0;
+font-family:Arial, sans-serif;
+background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+color:white;
+display:flex;
+justify-content:center;
+}
+.app{
+max-width:540px;
+width:100%;
+padding:20px;
+}
+.card{
+background:#00000088;
+padding:20px;
+border-radius:15px;
+transition:0.3s;
+}
+.progress{
+height:8px;
+background:#ffffff22;
+border-radius:5px;
+overflow:hidden;
+margin-bottom:15px;
+}
+.progress-bar{
+height:8px;
+background:#00ffc3;
+width:0%;
+transition:0.4s;
+}
+button{
+width:100%;
+padding:10px;
+margin:6px 0;
+border:none;
+border-radius:8px;
+font-weight:bold;
+cursor:pointer;
+}
+.option{background:#ffffff22;color:white;}
+.option.selected{background:#00ffc3;color:black;}
+.nav{background:#00ffc3;color:black;}
+textarea{
+width:100%;
+height:70px;
+border-radius:8px;
+margin-top:10px;
+}
+.matrix{
+display:grid;
+grid-template-columns:repeat(5,1fr);
+gap:4px;
+margin-top:10px;
+}
+.cell{
+height:18px;
+border-radius:3px;
+}
+.hidden{display:none;}
+</style>
+</head>
+<body>
+
+<div class="app">
+<h2>💎 Compatibilidad Relacional 5.0</h2>
+
+<div class="card">
+<div class="progress"><div class="progress-bar" id="bar"></div></div>
+<div id="questionBox"></div>
+<button class="nav" onclick="prev()">Anterior</button>
+<button class="nav" onclick="next()">Siguiente</button>
+</div>
+
+<button class="nav" onclick="generate()">Generar Código Seguro</button>
+
+<div id="codeArea" class="hidden">
+<h3>Tu Código</h3>
+<textarea id="myCode" readonly></textarea>
+</div>
+
+<h3>Analizar</h3>
+<textarea id="otherCode" placeholder="Pega código recibido"></textarea>
+<button class="nav" onclick="analyze()">Analizar Compatibilidad</button>
+
+<div id="result"></div>
+
+</div>
+
+<script>
+
+const questions=[
+{q:"Dialogas inmediatamente en conflicto",cat:"emocional",w:1.6},
+{q:"Planificas vacaciones",cat:"estilo",w:1},
+{q:"Eres ahorrador/a",cat:"finanzas",w:1.5},
+{q:"Prefieres vida social activa",cat:"social",w:1},
+{q:"Expresas emociones fácilmente",cat:"emocional",w:1.7},
+{q:"Te gusta rutina organizada",cat:"estilo",w:1.2},
+{q:"Celos son inaceptables",cat:"emocional",w:1.6},
+{q:"Alta exposición en redes",cat:"social",w:0.8},
+{q:"Buscas estabilidad largo plazo",cat:"vision",w:1.6},
+{q:"Deseas hijos",cat:"vision",w:1.5},
+{q:"Improvisación incomoda",cat:"estilo",w:1},
+{q:"Necesitas afecto constante",cat:"emocional",w:1.3},
+{q:"Orden estricto en casa",cat:"estilo",w:1.1},
+{q:"Confianza se construye lento",cat:"emocional",w:1.4},
+{q:"Proyectas relación permanente",cat:"vision",w:1.8}
+];
+
+let current=0;
+let answers=new Array(15).fill(null);
+
+function render(){
+let q=questions[current];
+document.getElementById("questionBox").innerHTML=`
+<h3>Pregunta ${current+1}/15</h3>
+<p>${q.q}</p>
+<button class="option ${answers[current]===1?'selected':''}" onclick="select(1)">A (Sí)</button>
+<button class="option ${answers[current]===0?'selected':''}" onclick="select(0)">B (No)</button>
+`;
+document.getElementById("bar").style.width=((current+1)/15*100)+"%";
+}
+
+function select(v){answers[current]=v;render();}
+function next(){if(current<14){current++;render();}}
+function prev(){if(current>0){current--;render();}}
+
+async function sha256(t){
+const e=new TextEncoder().encode(t);
+const b=await crypto.subtle.digest("SHA-256",e);
+return Array.from(new Uint8Array(b)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+async function generate(){
+if(answers.includes(null)){alert("Completa todo.");return;}
+let raw=answers.join("");
+let ts=Date.now();
+let base=raw+"|"+ts;
+let sig=await sha256(base);
+let final=btoa(base+"|"+sig);
+document.getElementById("myCode").value=final;
+document.getElementById("codeArea").classList.remove("hidden");
+}
+
+async function analyze(){
+if(answers.includes(null)){alert("Responde primero.");return;}
+let other=document.getElementById("otherCode").value;
+let decoded;
+try{decoded=atob(other);}catch{alert("Código inválido");return;}
+let p=decoded.split("|");
+if(p.length!==3){alert("Código corrupto");return;}
+
+let verify=await sha256(p[0]+"|"+p[1]);
+if(verify!==p[2]){alert("Código alterado.");return;}
+
+let myRaw=answers.join("");
+let otherRaw=p[0];
+
+let total=0,match=0,critical=0,complement=0;
+let matrix="<div class='matrix'>";
+
+questions.forEach((q,i)=>{
+total+=q.w;
+if(myRaw[i]===otherRaw[i]){
+match+=q.w;
+matrix+="<div class='cell' style='background:#00ffc3'></div>";
+}else{
+matrix+="<div class='cell' style='background:#ff4d4d'></div>";
+if(q.cat==="emocional"||q.cat==="vision") critical++;
+if(q.cat==="estilo"||q.cat==="social") complement+=q.w;
+}
+});
+
+matrix+="</div>";
+
+let compat=Math.round((match/total)*100);
+let stability=Math.max(0,compat-critical*5);
+let complementIndex=Math.round((complement/total)*100);
+
+document.getElementById("result").innerHTML=`
+<h2>Compatibilidad Global: ${compat}%</h2>
+<p><strong>Estabilidad Proyectada:</strong> ${stability}%</p>
+<p><strong>Complementariedad Adaptativa:</strong> ${complementIndex}%</p>
+<p><strong>Divergencias Críticas:</strong> ${critical}</p>
+<h3>Matriz Visual</h3>
+${matrix}
+<hr>
+<p><em>Exporta como PDF usando Imprimir → Guardar como PDF.</em></p>
+`;
+}
+
+render();
+
+</script>
+</body>
+</html>
